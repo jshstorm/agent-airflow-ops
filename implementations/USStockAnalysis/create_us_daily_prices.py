@@ -15,8 +15,8 @@ try:
     import numpy as np
     import yfinance as yf
     from tqdm import tqdm
-from dotenv import load_dotenv
-from us_config import get_data_dir
+    from dotenv import load_dotenv
+    from us_config import get_data_dir
     load_dotenv()
 except ImportError as e:
     print(f"Missing dependency: {e}")

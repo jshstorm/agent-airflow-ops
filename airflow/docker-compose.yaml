@@ -82,18 +82,6 @@ services:
       - ./requirements.txt:/opt/airflow/requirements.txt
       - /var/run/docker.sock:/var/run/docker.sock
       - ../implementations:/opt/project/implementations
-    # Install additional requirements at startup
-    entrypoint: >
-      /bin/bash -c "
-      if [ -f /opt/airflow/requirements.txt ]; then pip install -r /opt/airflow/requirements.txt; fi &&
-      /entrypoint scheduler"
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ./logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-      - ./requirements.txt:/opt/airflow/requirements.txt
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ../implementations:/opt/project/implementations
 
   airflow-init:
     <<: *airflow-common
