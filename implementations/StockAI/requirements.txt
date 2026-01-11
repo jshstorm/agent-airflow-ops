@@ -4,7 +4,7 @@
 # Core Data Processing
 pandas>=2.0.0
 numpy>=1.24.0
-yfinance==0.2.40
+yfinance>=0.2.50
 
 # Web Requests & Scraping
 requests>=2.31.0
