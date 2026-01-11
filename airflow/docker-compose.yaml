@@ -48,6 +48,18 @@ services:
         condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
+    # Necessary configuration for runtime dependency installation in development
+    entrypoint: >
+      /bin/bash -c "
+      if [ -f /opt/airflow/requirements.txt ]; then pip install -r /opt/airflow/requirements.txt; fi &&
+      /entrypoint webserver"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./requirements.txt:/opt/airflow/requirements.txt
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../implementations:/opt/project/implementations
 
   airflow-scheduler:
     <<: *airflow-common
@@ -57,11 +69,31 @@ services:
         condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
-    # Important: Run as root to access docker socket, or use correct GID
-    # For local dev, setting user to root is often easiest for socket access, 
-    # BUT standard way is using AIRFLOW_UID. 
-    # If permission denied occurs, we might need to adjust this.
     user: "${AIRFLOW_UID:-50000}:0"
+    # Necessary configuration for runtime dependency installation in development
+    entrypoint: >
+      /bin/bash -c "
+      if [ -f /opt/airflow/requirements.txt ]; then pip install -r /opt/airflow/requirements.txt; fi &&
+      /entrypoint scheduler"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./requirements.txt:/opt/airflow/requirements.txt
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../implementations:/opt/project/implementations
+    # Install additional requirements at startup
+    entrypoint: >
+      /bin/bash -c "
+      if [ -f /opt/airflow/requirements.txt ]; then pip install -r /opt/airflow/requirements.txt; fi &&
+      /entrypoint scheduler"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./requirements.txt:/opt/airflow/requirements.txt
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../implementations:/opt/project/implementations
 
   airflow-init:
     <<: *airflow-common
