@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>US Stock Analysis - Smart Money Dashboard</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0f;
+            color: #e0e0e0;
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0f 100%);
+            padding: 16px 24px;
+            border-bottom: 1px solid #2a2a3a;
+        }
+
+        .header-content {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: #4ade80;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .lang-toggle {
+            padding: 6px 12px;
+            border: 1px solid #3a3a4a;
+            border-radius: 6px;
+            background: transparent;
+            color: #a0a0a0;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .lang-toggle.active {
+            background: #4ade80;
+            color: #0a0a0f;
+            border-color: #4ade80;
+        }
+
+        /* Market Indices Bar */
+        .market-bar {
+            background: #12121a;
+            padding: 12px 24px;
+            overflow-x: auto;
+            border-bottom: 1px solid #2a2a3a;
+        }
+
+        .market-indices {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            gap: 24px;
+        }
+
+        .index-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .index-name {
+            color: #808080;
+            font-size: 12px;
+        }
+
+        .index-price {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .index-change {
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .index-change.positive {
+            background: rgba(74, 222, 128, 0.15);
+            color: #4ade80;
+        }
+
+        .index-change.negative {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+
+        /* Main Layout */
+        .main-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 24px;
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Cards */
+        .card {
+            background: #12121a;
+            border: 1px solid #2a2a3a;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #2a2a3a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .card-body {
+            padding: 16px 20px;
+        }
+
+        /* Smart Money Table */
+        .stock-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .stock-table th,
+        .stock-table td {
+            padding: 12px 8px;
+            text-align: left;
+            border-bottom: 1px solid #2a2a3a;
+        }
+
+        .stock-table th {
+            color: #808080;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stock-table tbody tr {
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .stock-table tbody tr:hover {
+            background: #1a1a2e;
+        }
+
+        .stock-table tbody tr.selected {
+            background: #1e3a5f;
+        }
+
+        .ticker-cell {
+            font-weight: 600;
+            color: #4ade80;
+        }
+
+        .name-cell {
+            color: #a0a0a0;
+            font-size: 13px;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .score-cell {
+            font-weight: 700;
+            color: #60a5fa;
+        }
+
+        .grade-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .grade-S { background: #4ade80; color: #0a0a0f; }
+        .grade-A { background: #22c55e; color: #0a0a0f; }
+        .grade-B { background: #facc15; color: #0a0a0f; }
+        .grade-C { background: #f97316; color: #0a0a0f; }
+        .grade-D { background: #ef4444; color: #fff; }
+
+        .change-positive { color: #4ade80; }
+        .change-negative { color: #ef4444; }
+
+        /* Chart Section */
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .chart-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .chart-title h3 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .chart-title .ticker {
+            color: #4ade80;
+        }
+
+        .chart-title .score {
+            background: #1e3a5f;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #60a5fa;
+        }
+
+        .period-buttons {
+            display: flex;
+            gap: 4px;
+        }
+
+        .period-btn {
+            padding: 6px 12px;
+            border: 1px solid #3a3a4a;
+            border-radius: 6px;
+            background: transparent;
+            color: #808080;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .period-btn:hover {
+            border-color: #4ade80;
+            color: #4ade80;
+        }
+
+        .period-btn.active {
+            background: #4ade80;
+            color: #0a0a0f;
+            border-color: #4ade80;
+        }
+
+        #stock-chart {
+            width: 100%;
+            height: 400px;
+        }
+
+        /* Indicator Buttons */
+        .indicator-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .indicator-btn {
+            padding: 6px 14px;
+            border: 1px solid #3a3a4a;
+            border-radius: 6px;
+            background: transparent;
+            color: #a0a0a0;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .indicator-btn:hover {
+            border-color: #60a5fa;
+        }
+
+        .indicator-btn.active {
+            background: #1e3a5f;
+            color: #60a5fa;
+            border-color: #60a5fa;
+        }
+
+        /* AI Summary */
+        .ai-summary {
+            padding: 16px;
+            background: #1a1a2e;
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+
+        .ai-summary h4 {
+            font-size: 13px;
+            color: #808080;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .ai-summary-content {
+            color: #e0e0e0;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .summary-grade {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .summary-factors {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .factor-tag {
+            background: #2a2a3a;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #a0a0a0;
+        }
+
+        /* Macro Section */
+        .macro-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .macro-item {
+            background: #1a1a2e;
+            padding: 12px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .macro-name {
+            font-size: 12px;
+            color: #808080;
+        }
+
+        .macro-value {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .macro-change {
+            font-size: 11px;
+            margin-left: 6px;
+        }
+
+        /* Sector Heatmap */
+        .sector-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .sector-item {
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .sector-name {
+            font-size: 11px;
+            color: rgba(255,255,255,0.8);
+            margin-bottom: 4px;
+        }
+
+        .sector-change {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* History Section */
+        .history-selector {
+            margin-bottom: 16px;
+        }
+
+        .history-selector select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #3a3a4a;
+            border-radius: 8px;
+            background: #1a1a2e;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .history-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-item {
+            background: #1a1a2e;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #808080;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        /* Loading & Error States */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: #808080;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #3a3a4a;
+            border-top-color: #4ade80;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            color: #ef4444;
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* Price Flash Animation */
+        .price-up {
+            animation: flashGreen 0.5s;
+        }
+
+        .price-down {
+            animation: flashRed 0.5s;
+        }
+
+        @keyframes flashGreen {
+            0%, 100% { background: transparent; }
+            50% { background: rgba(74, 222, 128, 0.2); }
+        }
+
+        @keyframes flashRed {
+            0%, 100% { background: transparent; }
+            50% { background: rgba(239, 68, 68, 0.2); }
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+
+            .right-panel {
+                order: -1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .market-indices {
+                gap: 16px;
+            }
+
+            .main-container {
+                padding: 16px;
+            }
+
+            .macro-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .sector-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Filter */
+        .filter-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .filter-row select {
+            padding: 8px 12px;
+            border: 1px solid #3a3a4a;
+            border-radius: 6px;
+            background: #1a1a2e;
+            color: #fff;
+            font-size: 13px;
+        }
+
+        .filter-row input {
+            padding: 8px 12px;
+            border: 1px solid #3a3a4a;
+            border-radius: 6px;
+            background: #1a1a2e;
+            color: #fff;
+            font-size: 13px;
+            width: 150px;
+        }
+
+        .refresh-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background: #4ade80;
+            color: #0a0a0f;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: #22c55e;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">US Stock Analysis</div>
+            <div class="header-controls">
+                <button class="lang-toggle active" data-lang="en">EN</button>
+                <button class="lang-toggle" data-lang="ko">KO</button>
+                <button class="refresh-btn" onclick="refreshDashboard()">Refresh</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Market Indices Bar -->
+    <div class="market-bar">
+        <div class="market-indices" id="market-indices">
+            <div class="loading"><div class="spinner"></div> Loading market data...</div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Left Panel -->
+        <div class="left-panel">
+            <!-- Smart Money Picks -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 data-i18n="smartMoneyPicks">Smart Money Picks</h2>
+                    <div class="filter-row">
+                        <select id="sector-filter">
+                            <option value="">All Sectors</option>
+                            <option value="Technology">Technology</option>
+                            <option value="Financial">Financial</option>
+                            <option value="Healthcare">Healthcare</option>
+                            <option value="Consumer Cyclical">Consumer Cyclical</option>
+                            <option value="Energy">Energy</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <table class="stock-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Ticker</th>
+                                <th>Name</th>
+                                <th>Score</th>
+                                <th>Grade</th>
+                                <th>Price</th>
+                                <th>Change</th>
+                                <th>Upside</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stock-table-body">
+                            <tr><td colspan="8" class="loading"><div class="spinner"></div> Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Stock Chart -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="chart-header">
+                        <div class="chart-title">
+                            <h3><span class="ticker" id="chart-ticker">Select a stock</span></h3>
+                            <span class="score" id="chart-score"></span>
+                        </div>
+                        <div class="period-buttons">
+                            <button class="period-btn" data-period="1mo">1M</button>
+                            <button class="period-btn" data-period="3mo">3M</button>
+                            <button class="period-btn active" data-period="6mo">6M</button>
+                            <button class="period-btn" data-period="1y">1Y</button>
+                        </div>
+                    </div>
+                    <div id="stock-chart"></div>
+                    <div class="indicator-buttons">
+                        <button class="indicator-btn" data-indicator="rsi">RSI</button>
+                        <button class="indicator-btn" data-indicator="macd">MACD</button>
+                        <button class="indicator-btn" data-indicator="bb">Bollinger</button>
+                    </div>
+                    <div class="ai-summary" id="ai-summary">
+                        <h4>AI Analysis</h4>
+                        <div class="ai-summary-content" id="ai-summary-content">
+                            Select a stock to view AI analysis
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="right-panel">
+            <!-- Macro Overview -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 data-i18n="macroOverview">Macro Overview</h2>
+                </div>
+                <div class="card-body">
+                    <div class="macro-grid" id="macro-grid">
+                        <div class="loading"><div class="spinner"></div></div>
+                    </div>
+                    <div class="ai-summary" style="margin-top: 16px;">
+                        <h4>Market Analysis</h4>
+                        <div class="ai-summary-content" id="macro-analysis">
+                            Loading macro analysis...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sector Heatmap -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 data-i18n="sectorHeatmap">Sector Performance</h2>
+                </div>
+                <div class="card-body">
+                    <div class="sector-grid" id="sector-grid">
+                        <div class="loading"><div class="spinner"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance History -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 data-i18n="performanceHistory">Pick History</h2>
+                </div>
+                <div class="card-body">
+                    <div class="history-selector">
+                        <select id="history-date-select">
+                            <option value="">Select a date...</option>
+                        </select>
+                    </div>
+                    <div class="history-stats" id="history-stats">
+                        <div class="stat-item">
+                            <div class="stat-label">Avg Return</div>
+                            <div class="stat-value" id="avg-return">--</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Win Rate</div>
+                            <div class="stat-value" id="win-rate">--</div>
+                        </div>
+                    </div>
+                    <div id="history-picks"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // Global State
+        // ============================================
+        let currentLang = 'en';
+        let currentTicker = null;
+        let currentPeriod = '6mo';
+        let stockChart = null;
+        let smartMoneyData = [];
+        let indicatorState = { rsi: false, macd: false, bb: false };
+        let priceUpdateInterval = null;
+
+        // i18n translations
+        const i18n = {
+            en: {
+                smartMoneyPicks: 'Smart Money Picks',
+                macroOverview: 'Macro Overview',
+                sectorHeatmap: 'Sector Performance',
+                performanceHistory: 'Pick History'
+            },
+            ko: {
+                smartMoneyPicks: '스마트머니 추천',
+                macroOverview: '매크로 현황',
+                sectorHeatmap: '섹터 퍼포먼스',
+                performanceHistory: '추천 히스토리'
+            }
+        };
+
+        // ============================================
+        // Initialization
+        // ============================================
+        document.addEventListener('DOMContentLoaded', () => {
+            initDashboard();
+            setupEventListeners();
+            startPriceUpdates();
+        });
+
+        function initDashboard() {
+            loadMarketIndices();
+            loadSmartMoneyPicks();
+            loadMacroAnalysis();
+            loadSectorHeatmap();
+            loadHistoryDates();
+        }
+
+        function setupEventListeners() {
+            // Language toggle
+            document.querySelectorAll('.lang-toggle').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.lang-toggle').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentLang = btn.dataset.lang;
+                    translateUI();
+                    loadMacroAnalysis();
+                });
+            });
+
+            // Period buttons
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentPeriod = btn.dataset.period;
+                    if (currentTicker) loadStockChart(currentTicker, currentPeriod);
+                });
+            });
+
+            // Indicator buttons
+            document.querySelectorAll('.indicator-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.classList.toggle('active');
+                    const indicator = btn.dataset.indicator;
+                    indicatorState[indicator] = !indicatorState[indicator];
+                    if (currentTicker) loadTechnicalIndicators(currentTicker);
+                });
+            });
+
+            // Sector filter
+            document.getElementById('sector-filter').addEventListener('change', (e) => {
+                filterStocks(e.target.value);
+            });
+
+            // History date select
+            document.getElementById('history-date-select').addEventListener('change', (e) => {
+                if (e.target.value) loadHistoryPicks(e.target.value);
+            });
+        }
+
+        // ============================================
+        // Data Loading Functions
+        // ============================================
+        async function loadMarketIndices() {
+            try {
+                const resp = await fetch('/api/us/portfolio');
+                const data = await resp.json();
+
+                const container = document.getElementById('market-indices');
+                if (data.market_indices && data.market_indices.length > 0) {
+                    container.innerHTML = data.market_indices.map(idx => `
+                        <div class="index-item">
+                            <span class="index-name">${idx.name}</span>
+                            <span class="index-price">${formatNumber(idx.price)}</span>
+                            <span class="index-change ${idx.change >= 0 ? 'positive' : 'negative'}">
+                                ${idx.change >= 0 ? '+' : ''}${idx.change.toFixed(2)}%
+                            </span>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<span class="error-message">Failed to load market data</span>';
+                }
+            } catch (err) {
+                console.error('Error loading market indices:', err);
+            }
+        }
+
+        async function loadSmartMoneyPicks() {
+            try {
+                const resp = await fetch('/api/us/smart-money');
+                const data = await resp.json();
+
+                smartMoneyData = data.top_picks || [];
+                renderStockTable(smartMoneyData);
+
+                // Auto-select first stock
+                if (smartMoneyData.length > 0 && !currentTicker) {
+                    selectStock(smartMoneyData[0]);
+                }
+            } catch (err) {
+                console.error('Error loading smart money picks:', err);
+                document.getElementById('stock-table-body').innerHTML =
+                    '<tr><td colspan="8" class="error-message">Failed to load data</td></tr>';
+            }
+        }
+
+        function renderStockTable(stocks) {
+            const tbody = document.getElementById('stock-table-body');
+
+            if (!stocks || stocks.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="error-message">No data available. Run analysis scripts first.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = stocks.map(stock => {
+                const gradeClass = stock.grade ? 'grade-' + stock.grade.charAt(0) : '';
+                const changeClass = stock.change_pct >= 0 ? 'change-positive' : 'change-negative';
+
+                return `
+                    <tr data-ticker="${stock.ticker}" onclick="selectStock(${JSON.stringify(stock).replace(/"/g, '&quot;')})">
+                        <td>${stock.rank}</td>
+                        <td class="ticker-cell">${stock.ticker}</td>
+                        <td class="name-cell" title="${stock.name}">${stock.name}</td>
+                        <td class="score-cell">${stock.composite_score}</td>
+                        <td><span class="grade-badge ${gradeClass}">${stock.grade ? stock.grade.split(' ')[0] : 'N/A'}</span></td>
+                        <td class="price-cell" data-ticker="${stock.ticker}">$${stock.current_price}</td>
+                        <td class="${changeClass}">${stock.change_pct >= 0 ? '+' : ''}${stock.change_pct}%</td>
+                        <td class="${stock.target_upside >= 0 ? 'change-positive' : 'change-negative'}">
+                            ${stock.target_upside >= 0 ? '+' : ''}${stock.target_upside}%
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterStocks(sector) {
+            if (!sector) {
+                renderStockTable(smartMoneyData);
+            } else {
+                const filtered = smartMoneyData.filter(s => s.sector === sector);
+                renderStockTable(filtered);
+            }
+        }
+
+        function selectStock(stock) {
+            currentTicker = stock.ticker;
+
+            // Update table selection
+            document.querySelectorAll('.stock-table tbody tr').forEach(row => {
+                row.classList.toggle('selected', row.dataset.ticker === stock.ticker);
+            });
+
+            // Update chart header
+            document.getElementById('chart-ticker').textContent = `${stock.ticker} - ${stock.name}`;
+            document.getElementById('chart-score').textContent = `Score: ${stock.composite_score}`;
+
+            // Load chart and AI summary
+            loadStockChart(stock.ticker, currentPeriod);
+            loadAISummary(stock.ticker);
+        }
+
+        async function loadStockChart(ticker, period) {
+            try {
+                const container = document.getElementById('stock-chart');
+                container.innerHTML = '<div class="loading"><div class="spinner"></div> Loading chart...</div>';
+
+                const resp = await fetch(`/api/us/stock-chart/${ticker}?period=${period}`);
+                const data = await resp.json();
+
+                if (data.error || !data.candles || data.candles.length === 0) {
+                    container.innerHTML = '<div class="error-message">Chart data not available</div>';
+                    return;
+                }
+
+                container.innerHTML = '';
+
+                if (stockChart) {
+                    stockChart.remove();
+                }
+
+                stockChart = LightweightCharts.createChart(container, {
+                    width: container.clientWidth,
+                    height: 400,
+                    layout: {
+                        background: { color: '#12121a' },
+                        textColor: '#808080',
+                    },
+                    grid: {
+                        vertLines: { color: '#2a2a3a' },
+                        horzLines: { color: '#2a2a3a' },
+                    },
+                    crosshair: {
+                        mode: LightweightCharts.CrosshairMode.Normal,
+                    },
+                    rightPriceScale: {
+                        borderColor: '#2a2a3a',
+                    },
+                    timeScale: {
+                        borderColor: '#2a2a3a',
+                        timeVisible: true,
+                    },
+                });
+
+                const candleSeries = stockChart.addCandlestickSeries({
+                    upColor: '#4ade80',
+                    downColor: '#ef4444',
+                    borderUpColor: '#4ade80',
+                    borderDownColor: '#ef4444',
+                    wickUpColor: '#4ade80',
+                    wickDownColor: '#ef4444',
+                });
+
+                candleSeries.setData(data.candles);
+                stockChart.timeScale().fitContent();
+
+                // Load technical indicators if active
+                loadTechnicalIndicators(ticker);
+
+            } catch (err) {
+                console.error('Error loading chart:', err);
+                document.getElementById('stock-chart').innerHTML =
+                    '<div class="error-message">Failed to load chart</div>';
+            }
+        }
+
+        async function loadTechnicalIndicators(ticker) {
+            if (!stockChart) return;
+
+            try {
+                const resp = await fetch(`/api/us/technical-indicators/${ticker}`);
+                const data = await resp.json();
+
+                // Note: In a full implementation, you would add indicator series here
+                // This is a simplified version
+
+            } catch (err) {
+                console.error('Error loading indicators:', err);
+            }
+        }
+
+        async function loadAISummary(ticker) {
+            try {
+                const resp = await fetch(`/api/us/ai-summary/${ticker}`);
+                const data = await resp.json();
+
+                const container = document.getElementById('ai-summary-content');
+                const summary = data.summary;
+
+                if (summary && summary.grade) {
+                    const gradeClass = 'grade-' + summary.grade.charAt(0);
+                    container.innerHTML = `
+                        <div class="summary-grade">
+                            <span class="grade-badge ${gradeClass}">${summary.grade}</span>
+                            <span>Recommendation: ${summary.recommendation || 'N/A'}</span>
+                        </div>
+                        <p>Target Upside: ${summary.target_upside >= 0 ? '+' : ''}${summary.target_upside}%</p>
+                        <div class="summary-factors">
+                            ${(summary.key_factors || []).map(f => `<span class="factor-tag">${f}</span>`).join('')}
+                        </div>
+                    `;
+                } else {
+                    container.textContent = summary.message || 'No AI summary available for this stock.';
+                }
+            } catch (err) {
+                console.error('Error loading AI summary:', err);
+            }
+        }
+
+        async function loadMacroAnalysis() {
+            try {
+                const resp = await fetch(`/api/us/macro-analysis?lang=${currentLang}`);
+                const data = await resp.json();
+
+                // Render macro indicators
+                const grid = document.getElementById('macro-grid');
+                const indicators = data.macro_indicators || {};
+
+                const macroItems = Object.entries(indicators)
+                    .filter(([key, val]) => val && typeof val.value !== 'undefined')
+                    .slice(0, 6);
+
+                if (macroItems.length > 0) {
+                    grid.innerHTML = macroItems.map(([name, val]) => {
+                        const changeClass = (val.change_1d || 0) >= 0 ? 'change-positive' : 'change-negative';
+                        return `
+                            <div class="macro-item">
+                                <span class="macro-name">${name}</span>
+                                <div>
+                                    <span class="macro-value">${formatNumber(val.value)}</span>
+                                    <span class="macro-change ${changeClass}">
+                                        ${val.change_1d >= 0 ? '+' : ''}${val.change_1d?.toFixed(2) || 0}%
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    grid.innerHTML = '<p class="error-message">No macro data available</p>';
+                }
+
+                // Render AI analysis
+                const analysisContainer = document.getElementById('macro-analysis');
+                if (data.ai_analysis) {
+                    analysisContainer.innerHTML = data.ai_analysis.substring(0, 500) +
+                        (data.ai_analysis.length > 500 ? '...' : '');
+                } else {
+                    analysisContainer.textContent = 'Run macro_analyzer.py to generate AI analysis.';
+                }
+
+            } catch (err) {
+                console.error('Error loading macro analysis:', err);
+            }
+        }
+
+        async function loadSectorHeatmap() {
+            try {
+                const resp = await fetch('/api/us/sector-heatmap');
+                const data = await resp.json();
+
+                const grid = document.getElementById('sector-grid');
+                const sectors = data.sectors || [];
+
+                if (sectors.length > 0) {
+                    grid.innerHTML = sectors.map(sector => {
+                        const change = sector.change_1d || 0;
+                        const bgColor = change >= 2 ? '#166534' :
+                                       change >= 0.5 ? '#15803d' :
+                                       change >= 0 ? '#1a1a2e' :
+                                       change >= -0.5 ? '#7f1d1d' :
+                                       change >= -2 ? '#991b1b' : '#b91c1c';
+
+                        return `
+                            <div class="sector-item" style="background: ${bgColor}">
+                                <div class="sector-name">${sector.sector}</div>
+                                <div class="sector-change">${change >= 0 ? '+' : ''}${change.toFixed(2)}%</div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    grid.innerHTML = '<p class="error-message">No sector data</p>';
+                }
+            } catch (err) {
+                console.error('Error loading sector heatmap:', err);
+            }
+        }
+
+        async function loadHistoryDates() {
+            try {
+                const resp = await fetch('/api/us/history-dates');
+                const data = await resp.json();
+
+                const select = document.getElementById('history-date-select');
+                const dates = data.dates || [];
+
+                if (dates.length > 0) {
+                    select.innerHTML = '<option value="">Select a date...</option>' +
+                        dates.map(d => `<option value="${d}">${d}</option>`).join('');
+                }
+            } catch (err) {
+                console.error('Error loading history dates:', err);
+            }
+        }
+
+        async function loadHistoryPicks(date) {
+            try {
+                const resp = await fetch(`/api/us/history/${date}`);
+                const data = await resp.json();
+
+                if (data.error) {
+                    document.getElementById('history-picks').innerHTML =
+                        `<p class="error-message">${data.error}</p>`;
+                    return;
+                }
+
+                const picks = data.picks || [];
+
+                // Calculate stats
+                const returns = picks.filter(p => p.return_pct !== null).map(p => p.return_pct);
+                const avgReturn = returns.length > 0 ?
+                    (returns.reduce((a, b) => a + b, 0) / returns.length).toFixed(2) : '--';
+                const winRate = returns.length > 0 ?
+                    ((returns.filter(r => r > 0).length / returns.length) * 100).toFixed(0) + '%' : '--';
+
+                document.getElementById('avg-return').textContent =
+                    avgReturn !== '--' ? `${avgReturn >= 0 ? '+' : ''}${avgReturn}%` : avgReturn;
+                document.getElementById('avg-return').className =
+                    `stat-value ${avgReturn >= 0 ? 'change-positive' : 'change-negative'}`;
+
+                document.getElementById('win-rate').textContent = winRate;
+
+            } catch (err) {
+                console.error('Error loading history picks:', err);
+            }
+        }
+
+        // ============================================
+        // Utility Functions
+        // ============================================
+        function formatNumber(num) {
+            if (num === null || num === undefined) return 'N/A';
+            if (Math.abs(num) >= 1000) {
+                return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+            }
+            return num.toFixed(2);
+        }
+
+        function translateUI() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.dataset.i18n;
+                if (i18n[currentLang] && i18n[currentLang][key]) {
+                    el.textContent = i18n[currentLang][key];
+                }
+            });
+        }
+
+        function refreshDashboard() {
+            initDashboard();
+        }
+
+        function startPriceUpdates() {
+            // Update prices every 30 seconds
+            priceUpdateInterval = setInterval(updatePrices, 30000);
+        }
+
+        async function updatePrices() {
+            if (smartMoneyData.length === 0) return;
+
+            const tickers = smartMoneyData.slice(0, 20).map(s => s.ticker);
+
+            try {
+                const resp = await fetch('/api/us/realtime-prices', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tickers })
+                });
+                const prices = await resp.json();
+
+                for (const [ticker, data] of Object.entries(prices)) {
+                    const cell = document.querySelector(`.price-cell[data-ticker="${ticker}"]`);
+                    if (cell && data.price) {
+                        const oldPrice = parseFloat(cell.textContent.replace('$', ''));
+                        cell.textContent = `$${data.price}`;
+
+                        cell.classList.remove('price-up', 'price-down');
+                        if (data.price > oldPrice) {
+                            cell.classList.add('price-up');
+                        } else if (data.price < oldPrice) {
+                            cell.classList.add('price-down');
+                        }
+                    }
+                }
+            } catch (err) {
+                // Silent fail for price updates
+            }
+        }
+    </script>
+</body>
+</html>

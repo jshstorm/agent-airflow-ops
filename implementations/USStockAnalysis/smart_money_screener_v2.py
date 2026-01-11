@@ -488,18 +488,51 @@ class EnhancedSmartMoneyScreener:
     def run(self, top_n: int = 50) -> pd.DataFrame:
         """Main execution"""
         logger.info("Starting Enhanced Smart Money Screener v2.0...")
-        
+
         if not self.load_data():
             logger.error("Failed to load data")
             return pd.DataFrame()
-        
+
         results_df = self.run_screening(top_n)
-        
+
         # Save results
         results_df.to_csv(self.output_file, index=False)
         logger.info(f"Saved to {self.output_file}")
-        
+
+        # Save to history
+        self._save_to_history(results_df, top_n)
+
         return results_df
+
+    def _save_to_history(self, df: pd.DataFrame, top_n: int):
+        """Save today's picks to history folder"""
+        try:
+            history_dir = os.path.join(self.data_dir, 'history')
+            os.makedirs(history_dir, exist_ok=True)
+
+            today = datetime.now().strftime('%Y-%m-%d')
+            history_file = os.path.join(history_dir, f'picks_{today}.json')
+
+            # Save top picks with key data
+            picks = []
+            for _, row in df.head(top_n).iterrows():
+                picks.append({
+                    'ticker': row['ticker'],
+                    'name': row.get('name', row['ticker']),
+                    'score': row['composite_score'],
+                    'grade': row['grade'],
+                    'price': row['current_price'],
+                    'recommendation': row.get('recommendation', 'hold'),
+                    'target_upside': row.get('target_upside', 0)
+                })
+
+            import json
+            with open(history_file, 'w') as f:
+                json.dump(picks, f, indent=2)
+
+            logger.info(f"Saved history: {history_file}")
+        except Exception as e:
+            logger.warning(f"Failed to save history: {e}")
 
 
 def main():
