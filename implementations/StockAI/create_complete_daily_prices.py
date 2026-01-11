@@ -22,7 +22,9 @@ import logging
 # 로깅 설정
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    force=True,  # 기존 핸들러 덮어쓰기
+    handlers=[logging.StreamHandler()]  # 표준 출력으로 즉시 내보내기
 )
 logger = logging.getLogger(__name__)
 
@@ -177,16 +179,23 @@ def collect_all_prices(days_back: int = 365) -> pd.DataFrame:
         logger.error(f"Stock list file not found: {STOCKS_LIST_FILE}")
         return pd.DataFrame()
     
+    logger.info(f"Loading stock list from {STOCKS_LIST_FILE}...")
     stocks_df = pd.read_csv(STOCKS_LIST_FILE, dtype={'ticker': str})
     stocks_df['ticker'] = stocks_df['ticker'].str.zfill(6)
     
-    logger.info(f"Collecting data for {len(stocks_df)} stocks...")
+    logger.info(f"Loaded {len(stocks_df)} stocks. Starting collection for {days_back} days...")
     
     # 기존 데이터 로드
+    logger.info("Loading existing price data...")
     existing_data = load_existing_data()
+    if not existing_data.empty:
+        logger.info(f"Existing data loaded: {len(existing_data)} rows.")
+    else:
+        logger.info("No existing data found. Starting fresh.")
     
     # 페이지 수 계산 (1페이지 ≈ 10일)
     pages = max(1, days_back // 10)
+    logger.info(f"Fetching {pages} pages per stock...")
     
     all_data = []
     failed_tickers = []
