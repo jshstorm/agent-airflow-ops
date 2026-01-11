@@ -12,6 +12,7 @@ import yfinance as yf
 from datetime import datetime
 from typing import Dict, List
 import logging
+from us_config import get_data_dir
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ class SectorHeatmapCollector:
     def __init__(self, data_dir: str = '.'):
         self.data_dir = data_dir
         self.output_file = os.path.join(data_dir, 'sector_heatmap.json')
+        self.csv_output_file = os.path.join(data_dir, 'us_sector_heatmap.csv')
         
         # Sector ETFs with full names
         self.sector_etfs = {
@@ -201,6 +203,11 @@ class SectorHeatmapCollector:
         with open(self.output_file, 'w', encoding='utf-8') as f:
             json.dump(combined, f, ensure_ascii=False, indent=2)
         
+        if isinstance(etf_data, dict) and etf_data.get('sectors'):
+            df = pd.DataFrame(etf_data['sectors'])
+            df.to_csv(self.csv_output_file, index=False)
+            logger.info(f"Saved sector CSV: {self.csv_output_file}")
+
         logger.info(f"Saved to {self.output_file}")
         return combined
 
@@ -208,9 +215,10 @@ class SectorHeatmapCollector:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='Sector Heatmap Data Collector')
-    parser.add_argument('--dir', default='.', help='Data directory')
+    parser.add_argument('--dir', default=get_data_dir(), help='Data directory')
     args = parser.parse_args()
     
+    os.makedirs(args.dir, exist_ok=True)
     collector = SectorHeatmapCollector(data_dir=args.dir)
     result = collector.run()
     

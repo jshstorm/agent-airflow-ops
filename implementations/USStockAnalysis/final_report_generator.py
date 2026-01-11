@@ -10,6 +10,7 @@ import json
 import logging
 import pandas as pd
 from datetime import datetime
+from us_config import get_data_dir
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -179,10 +180,11 @@ class FinalReportGenerator:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='Final Report Generator')
-    parser.add_argument('--dir', default='.', help='Data directory')
+    parser.add_argument('--dir', default=get_data_dir(), help='Data directory')
     parser.add_argument('--top', type=int, default=10, help='Number of top picks')
     args = parser.parse_args()
     
+    os.makedirs(args.dir, exist_ok=True)
     generator = FinalReportGenerator(data_dir=args.dir)
     report = generator.run(top_n=args.top)
     

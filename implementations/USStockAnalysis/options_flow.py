@@ -8,6 +8,7 @@ Tracks options volume and unusual activity to detect large investor positioning
 import os
 import json
 import logging
+from us_config import get_data_dir
 import yfinance as yf
 from datetime import datetime
 from typing import Dict, List
@@ -177,10 +178,11 @@ class OptionsFlowAnalyzer:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='Options Flow Analyzer')
-    parser.add_argument('--dir', default='.', help='Data directory')
+    parser.add_argument('--dir', default=get_data_dir(), help='Data directory')
     parser.add_argument('--tickers', nargs='+', help='Specific tickers to analyze')
     args = parser.parse_args()
     
+    os.makedirs(args.dir, exist_ok=True)
     analyzer = OptionsFlowAnalyzer(data_dir=args.dir)
     result = analyzer.run(tickers=args.tickers)
     

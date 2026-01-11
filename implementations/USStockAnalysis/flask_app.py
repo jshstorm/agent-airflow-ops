@@ -8,19 +8,32 @@ Serves the analysis dashboard and API endpoints
 import os
 import json
 import logging
+import time
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
 from flask import Flask, jsonify, render_template, request
+from us_config import (
+    get_data_dir,
+    resolve_history_dir,
+    get_cache_ttl_seconds,
+    get_price_cache_ttl_seconds,
+    get_rate_limit_delay,
+)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = get_data_dir()
+HISTORY_DIR = resolve_history_dir()
+os.makedirs(DATA_DIR, exist_ok=True)
+if os.path.abspath(HISTORY_DIR).startswith(os.path.abspath(DATA_DIR)):
+    os.makedirs(HISTORY_DIR, exist_ok=True)
 app = Flask(__name__,
             template_folder=os.path.join(BASE_DIR, "templates"),
             static_folder=os.path.join(BASE_DIR, "static"))
@@ -36,26 +49,101 @@ SECTOR_MAP = {
     'XOM': 'Energy', 'CVX': 'Energy', 'KO': 'Consumer Defensive', 'PEP': 'Consumer Defensive',
 }
 
-# Cache for price data
+# Cache for price and API data
 _price_cache: Dict[str, Dict] = {}
+_data_cache: Dict[str, Dict] = {}
 _cache_timestamp: datetime = datetime.min
+_last_request_time: float = 0.0
+
+CACHE_TTL_SECONDS = get_cache_ttl_seconds()
+PRICE_CACHE_TTL_SECONDS = get_price_cache_ttl_seconds()
+RATE_LIMIT_DELAY = get_rate_limit_delay()
+
+
+def _resolve_data_path(filename: str) -> str:
+    primary = os.path.join(DATA_DIR, filename)
+    if os.path.exists(primary):
+        return primary
+    return os.path.join(BASE_DIR, filename)
+
+
+def _throttle() -> None:
+    global _last_request_time
+    now = time.time()
+    elapsed = now - _last_request_time
+    if elapsed < RATE_LIMIT_DELAY:
+        time.sleep(RATE_LIMIT_DELAY - elapsed)
+    _last_request_time = time.time()
+
+
+def _get_cached(key: str, ttl: int) -> Optional[Dict]:
+    cached = _data_cache.get(key)
+    if not cached:
+        return None
+    if (datetime.now() - cached["ts"]).total_seconds() > ttl:
+        return None
+    return cached["value"]
+
+
+def _set_cached(key: str, value: Dict) -> None:
+    _data_cache[key] = {"value": value, "ts": datetime.now()}
+
+
+def _fetch_history(ticker: str, period: str, retries: int = 2) -> pd.DataFrame:
+    for attempt in range(retries + 1):
+        try:
+            _throttle()
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period=period)
+            if not hist.empty:
+                return hist
+        except Exception as exc:
+            if attempt == retries:
+                raise exc
+            time.sleep(0.5 * (attempt + 1))
+    return pd.DataFrame()
+
+
+def _get_price_snapshot(ticker: str) -> Tuple[Optional[float], Optional[float]]:
+    cached = _price_cache.get(ticker)
+    if cached and (datetime.now() - cached["ts"]).total_seconds() < PRICE_CACHE_TTL_SECONDS:
+        return cached["price"], cached["prev_close"]
+
+    try:
+        _throttle()
+        stock = yf.Ticker(ticker)
+        info = stock.fast_info
+        current = getattr(info, "last_price", None)
+        prev = getattr(info, "previous_close", None) or current
+    except Exception:
+        current = None
+        prev = None
+
+    _price_cache[ticker] = {"price": current, "prev_close": prev, "ts": datetime.now()}
+    return current, prev
 
 
 def get_sector(ticker: str) -> str:
     """Get sector for a ticker"""
     if ticker in SECTOR_MAP:
         return SECTOR_MAP[ticker]
+    cached = _get_cached(f"sector:{ticker}", CACHE_TTL_SECONDS)
+    if cached:
+        return cached.get("sector", "Unknown")
     try:
+        _throttle()
         stock = yf.Ticker(ticker)
         info = stock.info
-        return info.get('sector', 'Unknown')
+        sector = info.get('sector', 'Unknown')
+        _set_cached(f"sector:{ticker}", {"sector": sector})
+        return sector
     except Exception:
         return 'Unknown'
 
 
 def load_csv_data(filename: str) -> Optional[pd.DataFrame]:
     """Load CSV file from data directory"""
-    filepath = os.path.join(BASE_DIR, filename)
+    filepath = _resolve_data_path(filename)
     if os.path.exists(filepath):
         return pd.read_csv(filepath)
     return None
@@ -63,7 +151,7 @@ def load_csv_data(filename: str) -> Optional[pd.DataFrame]:
 
 def load_json_data(filename: str) -> Optional[Dict]:
     """Load JSON file from data directory"""
-    filepath = os.path.join(BASE_DIR, filename)
+    filepath = _resolve_data_path(filename)
     if os.path.exists(filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -124,6 +212,10 @@ def index():
 def get_portfolio():
     """Get market indices data"""
     try:
+        cached = _get_cached("market_indices", CACHE_TTL_SECONDS)
+        if cached:
+            return jsonify(cached)
+
         indices = {
             'SPY': 'S&P 500',
             'QQQ': 'NASDAQ 100',
@@ -138,8 +230,7 @@ def get_portfolio():
         market_indices = []
         for ticker, name in indices.items():
             try:
-                stock = yf.Ticker(ticker)
-                hist = stock.history(period='2d')
+                hist = _fetch_history(ticker, period='2d')
                 if len(hist) >= 2:
                     current = hist['Close'].iloc[-1]
                     prev = hist['Close'].iloc[-2]
@@ -153,10 +244,12 @@ def get_portfolio():
             except Exception:
                 continue
 
-        return jsonify({
+        payload = {
             'market_indices': market_indices,
             'timestamp': datetime.now().isoformat()
-        })
+        }
+        _set_cached("market_indices", payload)
+        return jsonify(payload)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -177,14 +270,12 @@ def get_smart_money():
         top_picks = []
         for _, row in df.head(20).iterrows():
             ticker = row['ticker']
-            try:
-                stock = yf.Ticker(ticker)
-                info = stock.fast_info
-                current_price = getattr(info, 'last_price', None) or row.get('current_price', 0)
-                prev_close = getattr(info, 'previous_close', current_price)
-                change_pct = ((current_price / prev_close) - 1) * 100 if prev_close else 0
-            except Exception:
+            current_price, prev_close = _get_price_snapshot(ticker)
+            if current_price is None:
                 current_price = row.get('current_price', 0)
+            if prev_close:
+                change_pct = ((current_price / prev_close) - 1) * 100
+            else:
                 change_pct = 0
 
             sector = get_sector(ticker)
@@ -255,6 +346,10 @@ def get_macro_analysis():
     """Get macro analysis data"""
     try:
         lang = request.args.get('lang', 'ko')
+        cache_key = f"macro_analysis:{lang}"
+        cached = _get_cached(cache_key, CACHE_TTL_SECONDS)
+        if cached:
+            return jsonify(cached)
 
         # Try to load cached analysis
         if lang == 'en':
@@ -268,18 +363,22 @@ def get_macro_analysis():
             collector = MacroDataCollector()
             macro_data = collector.get_current_macro_data()
 
-            return jsonify({
+            payload = {
                 'macro_indicators': macro_data,
                 'ai_analysis': 'Run macro_analyzer.py to generate AI analysis',
                 'timestamp': datetime.now().isoformat()
-            })
+            }
+            _set_cached(cache_key, payload)
+            return jsonify(payload)
 
-        return jsonify({
+        payload = {
             'macro_indicators': analysis.get('macro_indicators', {}),
             'ai_analysis': analysis.get('ai_analysis', ''),
             'news': analysis.get('news', []),
             'timestamp': analysis.get('timestamp', datetime.now().isoformat())
-        })
+        }
+        _set_cached(cache_key, payload)
+        return jsonify(payload)
     except Exception as e:
         logger.error(f"Error in get_macro_analysis: {e}")
         return jsonify({'error': str(e)}), 500
@@ -298,8 +397,7 @@ def get_stock_chart(ticker: str):
         }
         yf_period = period_map.get(period, '1y')
 
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period=yf_period)
+        hist = _fetch_history(ticker, period=yf_period)
 
         if hist.empty:
             return jsonify({'error': 'No data available', 'candles': []})
@@ -317,8 +415,13 @@ def get_stock_chart(ticker: str):
             })
 
         # Get company info
-        info = stock.info
-        company_name = info.get('longName', '') or info.get('shortName', '') or ticker
+        try:
+            _throttle()
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            company_name = info.get('longName', '') or info.get('shortName', '') or ticker
+        except Exception:
+            company_name = ticker
 
         return jsonify({
             'ticker': ticker,
@@ -336,8 +439,7 @@ def get_technical_indicators(ticker: str):
     try:
         period = request.args.get('period', '6mo')
 
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period=period)
+        hist = _fetch_history(ticker, period=period)
 
         if hist.empty or len(hist) < 30:
             return jsonify({'error': 'Insufficient data'})
@@ -442,26 +544,20 @@ def get_realtime_prices():
 
         result = {}
         for ticker in tickers[:30]:  # Limit to 30 tickers
-            try:
-                stock = yf.Ticker(ticker)
-                info = stock.fast_info
-                price = getattr(info, 'last_price', None)
-                prev_close = getattr(info, 'previous_close', None)
-
-                if price is not None:
-                    change = 0
-                    change_pct = 0
-                    if prev_close and prev_close > 0:
-                        change = price - prev_close
-                        change_pct = (change / prev_close) * 100
-
-                    result[ticker] = {
-                        'price': round(price, 2),
-                        'change': round(change, 2),
-                        'change_pct': round(change_pct, 2)
-                    }
-            except Exception:
+            price, prev_close = _get_price_snapshot(ticker)
+            if price is None:
                 continue
+            change = 0
+            change_pct = 0
+            if prev_close and prev_close > 0:
+                change = price - prev_close
+                change_pct = (change / prev_close) * 100
+
+            result[ticker] = {
+                'price': round(price, 2),
+                'change': round(change, 2),
+                'change_pct': round(change_pct, 2)
+            }
 
         return jsonify(result)
     except Exception as e:
@@ -472,7 +568,7 @@ def get_realtime_prices():
 def get_history_dates():
     """Get list of available history dates"""
     try:
-        history_dir = os.path.join(BASE_DIR, 'history')
+        history_dir = HISTORY_DIR
         if not os.path.exists(history_dir):
             return jsonify({'dates': []})
 
@@ -492,7 +588,7 @@ def get_history_dates():
 def get_history(date: str):
     """Get historical picks for a specific date"""
     try:
-        history_file = os.path.join(BASE_DIR, 'history', f'picks_{date}.json')
+        history_file = os.path.join(HISTORY_DIR, f'picks_{date}.json')
 
         if not os.path.exists(history_file):
             return jsonify({'error': 'No history for this date'}), 404
@@ -507,8 +603,7 @@ def get_history(date: str):
 
             if ticker and rec_price > 0:
                 try:
-                    stock = yf.Ticker(ticker)
-                    current = stock.fast_info.last_price
+                    current, _ = _get_price_snapshot(ticker)
                     if current:
                         pick['current_price'] = round(current, 2)
                         pick['return_pct'] = round(((current / rec_price) - 1) * 100, 2)
@@ -516,9 +611,20 @@ def get_history(date: str):
                     pick['current_price'] = None
                     pick['return_pct'] = None
 
+        returns = [p['return_pct'] for p in picks if p.get('return_pct') is not None]
+        summary = {
+            'total_count': len(picks),
+            'valid_count': len(returns),
+            'avg_return_pct': round(float(np.mean(returns)), 2) if returns else None,
+            'median_return_pct': round(float(np.median(returns)), 2) if returns else None,
+            'win_rate': round(float(sum(1 for r in returns if r > 0) / len(returns) * 100), 1)
+            if returns else None,
+        }
+
         return jsonify({
             'date': date,
-            'picks': picks
+            'picks': picks,
+            'summary': summary
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -528,6 +634,10 @@ def get_history(date: str):
 def get_sector_heatmap():
     """Get sector performance heatmap data"""
     try:
+        cached = _get_cached("sector_heatmap", CACHE_TTL_SECONDS)
+        if cached:
+            return jsonify(cached)
+
         df = load_csv_data('us_sector_heatmap.csv')
 
         if df is None:
@@ -542,8 +652,7 @@ def get_sector_heatmap():
             sector_data = []
             for ticker, name in sectors.items():
                 try:
-                    stock = yf.Ticker(ticker)
-                    hist = stock.history(period='5d')
+                    hist = _fetch_history(ticker, period='5d')
                     if len(hist) >= 2:
                         change_1d = ((hist['Close'].iloc[-1] / hist['Close'].iloc[-2]) - 1) * 100
                         change_5d = ((hist['Close'].iloc[-1] / hist['Close'].iloc[0]) - 1) * 100
@@ -556,9 +665,13 @@ def get_sector_heatmap():
                 except Exception:
                     continue
 
-            return jsonify({'sectors': sector_data})
+            payload = {'sectors': sector_data}
+            _set_cached("sector_heatmap", payload)
+            return jsonify(payload)
 
-        return jsonify({'sectors': df.to_dict('records')})
+        payload = {'sectors': df.to_dict('records')}
+        _set_cached("sector_heatmap", payload)
+        return jsonify(payload)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

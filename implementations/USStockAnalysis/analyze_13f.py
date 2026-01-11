@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import json
 import time
+from us_config import get_data_dir
 
 # Logging Configuration
 logging.basicConfig(
@@ -217,10 +218,11 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='13F Institutional Analysis')
-    parser.add_argument('--dir', default='.', help='Data directory')
+    parser.add_argument('--dir', default=get_data_dir(), help='Data directory')
     parser.add_argument('--tickers', nargs='+', help='Specific tickers to analyze')
     args = parser.parse_args()
     
+    os.makedirs(args.dir, exist_ok=True)
     analyzer = SEC13FAnalyzer(data_dir=args.dir)
     
     if args.tickers:

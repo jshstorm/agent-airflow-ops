@@ -13,6 +13,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from io import StringIO
 from dotenv import load_dotenv
+from us_config import get_data_dir
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -287,9 +288,10 @@ Focus on: Which sectors benefit, which may suffer, and typical market reaction."
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='Economic Calendar')
-    parser.add_argument('--dir', default='.', help='Data directory')
+    parser.add_argument('--dir', default=get_data_dir(), help='Data directory')
     args = parser.parse_args()
     
+    os.makedirs(args.dir, exist_ok=True)
     calendar = EconomicCalendar(data_dir=args.dir)
     result = calendar.run()
     

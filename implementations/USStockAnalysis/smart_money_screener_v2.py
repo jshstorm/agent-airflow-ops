@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from tqdm import tqdm
 import warnings
+from us_config import get_data_dir, ensure_history_dir
 warnings.filterwarnings('ignore')
 
 # Logging Configuration
@@ -507,8 +508,7 @@ class EnhancedSmartMoneyScreener:
     def _save_to_history(self, df: pd.DataFrame, top_n: int):
         """Save today's picks to history folder"""
         try:
-            history_dir = os.path.join(self.data_dir, 'history')
-            os.makedirs(history_dir, exist_ok=True)
+            history_dir = ensure_history_dir(self.data_dir)
 
             today = datetime.now().strftime('%Y-%m-%d')
             history_file = os.path.join(history_dir, f'picks_{today}.json')
@@ -538,10 +538,11 @@ class EnhancedSmartMoneyScreener:
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dir', default='.')
+    parser.add_argument('--dir', default=get_data_dir())
     parser.add_argument('--top', type=int, default=20)
     args = parser.parse_args()
     
+    os.makedirs(args.dir, exist_ok=True)
     screener = EnhancedSmartMoneyScreener(data_dir=args.dir)
     results = screener.run(top_n=args.top)
     

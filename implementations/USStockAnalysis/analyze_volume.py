@@ -12,6 +12,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from tqdm import tqdm
+from us_config import get_data_dir
 
 # Logging Configuration
 logging.basicConfig(
@@ -256,9 +257,10 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='US Stock Volume Analysis')
-    parser.add_argument('--dir', default='.', help='Data directory')
+    parser.add_argument('--dir', default=get_data_dir(), help='Data directory')
     args = parser.parse_args()
     
+    os.makedirs(args.dir, exist_ok=True)
     analyzer = VolumeAnalyzer(data_dir=args.dir)
     results = analyzer.run()
     

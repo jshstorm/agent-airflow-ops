@@ -12,6 +12,7 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
 from typing import Dict, List
+from us_config import get_data_dir
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -204,10 +205,11 @@ class InsiderTracker:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='Insider Trading Tracker')
-    parser.add_argument('--dir', default='.', help='Data directory')
+    parser.add_argument('--dir', default=get_data_dir(), help='Data directory')
     parser.add_argument('--tickers', nargs='+', help='Specific tickers to analyze')
     args = parser.parse_args()
     
+    os.makedirs(args.dir, exist_ok=True)
     tracker = InsiderTracker(data_dir=args.dir)
     result = tracker.run(tickers=args.tickers)
     

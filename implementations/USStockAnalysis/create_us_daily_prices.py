@@ -15,7 +15,8 @@ try:
     import numpy as np
     import yfinance as yf
     from tqdm import tqdm
-    from dotenv import load_dotenv
+from dotenv import load_dotenv
+from us_config import get_data_dir
     load_dotenv()
 except ImportError as e:
     print(f"Missing dependency: {e}")
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 class USStockDailyPricesCreator:
     def __init__(self):
-        self.data_dir = os.getenv('DATA_DIR', '.')
+        self.data_dir = os.getenv('DATA_DIR', get_data_dir())
         self.output_dir = self.data_dir
         os.makedirs(self.output_dir, exist_ok=True)
         

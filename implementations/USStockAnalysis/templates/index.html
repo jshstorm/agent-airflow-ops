@@ -1137,18 +1137,28 @@
                 }
 
                 const picks = data.picks || [];
+                const summary = data.summary || {};
 
-                // Calculate stats
+                // Calculate stats (fallback)
                 const returns = picks.filter(p => p.return_pct !== null).map(p => p.return_pct);
-                const avgReturn = returns.length > 0 ?
-                    (returns.reduce((a, b) => a + b, 0) / returns.length).toFixed(2) : '--';
-                const winRate = returns.length > 0 ?
-                    ((returns.filter(r => r > 0).length / returns.length) * 100).toFixed(0) + '%' : '--';
+                const avgReturn = summary.avg_return_pct !== undefined && summary.avg_return_pct !== null
+                    ? summary.avg_return_pct.toFixed(2)
+                    : (returns.length > 0
+                        ? (returns.reduce((a, b) => a + b, 0) / returns.length).toFixed(2)
+                        : '--');
+                const winRate = summary.win_rate !== undefined && summary.win_rate !== null
+                    ? `${summary.win_rate}%`
+                    : (returns.length > 0
+                        ? ((returns.filter(r => r > 0).length / returns.length) * 100).toFixed(0) + '%'
+                        : '--');
 
+                const avgValue = avgReturn !== '--' ? parseFloat(avgReturn) : null;
                 document.getElementById('avg-return').textContent =
-                    avgReturn !== '--' ? `${avgReturn >= 0 ? '+' : ''}${avgReturn}%` : avgReturn;
+                    avgValue !== null ? `${avgValue >= 0 ? '+' : ''}${avgReturn}%` : avgReturn;
                 document.getElementById('avg-return').className =
-                    `stat-value ${avgReturn >= 0 ? 'change-positive' : 'change-negative'}`;
+                    avgValue !== null
+                        ? `stat-value ${avgValue >= 0 ? 'change-positive' : 'change-negative'}`
+                        : 'stat-value';
 
                 document.getElementById('win-rate').textContent = winRate;
 

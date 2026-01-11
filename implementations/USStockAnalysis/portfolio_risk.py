@@ -13,6 +13,7 @@ import numpy as np
 import yfinance as yf
 from datetime import datetime
 from typing import Dict, List
+from us_config import get_data_dir
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -217,11 +218,12 @@ class PortfolioRiskAnalyzer:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='Portfolio Risk Analyzer')
-    parser.add_argument('--dir', default='.', help='Data directory')
+    parser.add_argument('--dir', default=get_data_dir(), help='Data directory')
     parser.add_argument('--tickers', nargs='+', help='Portfolio tickers')
     parser.add_argument('--weights', nargs='+', type=float, help='Portfolio weights')
     args = parser.parse_args()
     
+    os.makedirs(args.dir, exist_ok=True)
     analyzer = PortfolioRiskAnalyzer(data_dir=args.dir)
     result = analyzer.run(tickers=args.tickers, weights=args.weights)
     

@@ -14,6 +14,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
+from us_config import get_data_dir
 
 # Load .env
 load_dotenv()
@@ -301,9 +302,10 @@ class MultiModelAnalyzer:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='Macro Market Analyzer')
-    parser.add_argument('--dir', default='.', help='Data directory')
+    parser.add_argument('--dir', default=get_data_dir(), help='Data directory')
     args = parser.parse_args()
     
+    os.makedirs(args.dir, exist_ok=True)
     analyzer = MultiModelAnalyzer(data_dir=args.dir)
     result = analyzer.run()
     

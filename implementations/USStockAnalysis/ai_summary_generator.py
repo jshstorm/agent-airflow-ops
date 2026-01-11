@@ -14,6 +14,7 @@ import pandas as pd
 from datetime import datetime
 from tqdm import tqdm
 from dotenv import load_dotenv
+from us_config import get_data_dir
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -197,11 +198,12 @@ class AIStockAnalyzer:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='AI Stock Summary Generator')
-    parser.add_argument('--dir', default='.', help='Data directory')
+    parser.add_argument('--dir', default=get_data_dir(), help='Data directory')
     parser.add_argument('--top', type=int, default=20, help='Number of top stocks')
     parser.add_argument('--refresh', action='store_true', help='Force refresh all summaries')
     args = parser.parse_args()
     
+    os.makedirs(args.dir, exist_ok=True)
     analyzer = AIStockAnalyzer(data_dir=args.dir)
     results = analyzer.run(top_n=args.top, force_refresh=args.refresh)
     
