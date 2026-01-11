@@ -62,12 +62,12 @@ def get_market_status() -> Dict:
         return {'status': 'UNKNOWN', 'message': 'Insufficient data'}
 
     latest = df.iloc[0]
-    close = latest['close']
+    close = float(latest['close'])
 
     # 이동평균 계산
-    ma20 = df['close'].head(20).mean()
-    ma50 = df['close'].head(50).mean() if len(df) >= 50 else ma20
-    ma200 = df['close'].head(200).mean() if len(df) >= 200 else ma50
+    ma20 = float(df['close'].head(20).mean())
+    ma50 = float(df['close'].head(50).mean()) if len(df) >= 50 else ma20
+    ma200 = float(df['close'].head(200).mean()) if len(df) >= 200 else ma50
 
     # 시장 상태 판단
     if close > ma20 > ma50:
@@ -84,13 +84,13 @@ def get_market_status() -> Dict:
         color = '#facc15'
 
     # 5일 변화율
-    change_5d = ((close / df.iloc[4]['close']) - 1) * 100 if len(df) > 4 else 0
+    change_5d = ((close / float(df.iloc[4]['close'])) - 1) * 100 if len(df) > 4 else 0
 
     return {
         'status': status,
         'message': message,
         'color': color,
-        'price': close,
+        'price': round(close, 2),
         'ma20': round(ma20, 2),
         'ma50': round(ma50, 2),
         'change_5d': round(change_5d, 2)
@@ -124,10 +124,10 @@ def get_summary():
             })
 
         # 요약 통계
-        total = len(df)
-        s_grade = len(df[df['investment_grade'] == 'S급 (즉시 매수)'])
-        a_grade = len(df[df['investment_grade'] == 'A급 (적극 매수)'])
-        avg_score = df['final_investment_score'].mean()
+        total = int(len(df))
+        s_grade = int(len(df[df['investment_grade'] == 'S급 (즉시 매수)']))
+        a_grade = int(len(df[df['investment_grade'] == 'A급 (적극 매수)']))
+        avg_score = float(df['final_investment_score'].mean())
 
         # 분석 날짜
         analysis_date = df['current_date'].iloc[0] if 'current_date' in df.columns else 'N/A'

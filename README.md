@@ -231,6 +231,25 @@ python flask_app.py       # Flask 대시보드 실행 (port 5003)
 
 ---
 
+## 테스트 실행
+
+```bash
+# [DividendOptimizer]
+cd implementations/DividendOptimizer
+pytest
+
+# [USStockAnalysis]
+cd implementations/USStockAnalysis
+export DATA_DIR=./data
+pytest
+
+# [StockAI]
+cd implementations/StockAI
+pytest
+```
+
+---
+
 ## 에이전트 실행 체크리스트
 
 각 Phase 완료 시 다음을 확인:

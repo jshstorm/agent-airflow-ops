@@ -34,3 +34,4 @@ lxml_html_clean>=0.1.0
 
 # Technical Analysis (optional)
 ta>=0.10.2
+pytest>=7.4.0

@@ -3,3 +3,4 @@ pandas>=1.5
 numpy>=1.20
 scipy>=1.9
 yfinance>=0.2.0
+pytest>=7.4.0
