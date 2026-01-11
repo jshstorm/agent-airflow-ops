@@ -1,0 +1,27 @@
+FROM python:3.10-slim
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Working directory
+WORKDIR /app
+
+# Copy requirements from all implementation folders
+# Note: We assume the build context is the project root
+COPY implementations/StockAI/requirements.txt /tmp/req_kr.txt
+COPY implementations/USStockAnalysis/requirements.txt /tmp/req_us.txt
+COPY implementations/DividendOptimizer/requirements.txt /tmp/req_div.txt
+
+# Merge and install requirements
+# 1. Concatenate all requirements
+# 2. Sort and remove duplicates to avoid conflicts (simple approach)
+# 3. Install
+RUN cat /tmp/req_*.txt | sort | uniq > /tmp/all_requirements.txt && \
+    pip install --no-cache-dir -r /tmp/all_requirements.txt
+
+# Default command
+CMD ["bash"]
